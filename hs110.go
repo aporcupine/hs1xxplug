@@ -13,17 +13,26 @@ type Hs1xxPlug struct {
 	IPAddress string
 }
 
-func (p *Hs1xxPlug) TurnOn() (err error) {
-	json := `{"system":{"set_relay_state":{"state":1}}}`
+// SetState sets the state of the plug where true = on and false = off
+func (p *Hs1xxPlug) SetState(state bool) (err error) {
+	var stateInt int8
+	if state {
+		stateInt = 1
+	}
+	// TODO: Make this a struct
+	json := fmt.Sprintf(`{"system":{"set_relay_state":{"state":%d}}}`, stateInt)
 	data := encrypt(json)
 	_, err = send(p.IPAddress, data)
 	return
 }
 
+func (p *Hs1xxPlug) TurnOn() (err error) {
+	err = p.SetState(true)
+	return
+}
+
 func (p *Hs1xxPlug) TurnOff() (err error) {
-	json := `{"system":{"set_relay_state":{"state":0}}}`
-	data := encrypt(json)
-	_, err = send(p.IPAddress, data)
+	err = p.SetState(false)
 	return
 }
 
@@ -103,5 +112,4 @@ func send(ip string, payload []byte) (data []byte, err error) {
 		fmt.Println("Cannot read data from plug:", err)
 	}
 	return
-
 }
