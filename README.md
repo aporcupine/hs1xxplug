@@ -53,6 +53,7 @@ The results printed (after cleaning up):
 
 Functions include:
 
+- SetState() -- sets the state of the plug where true = on and false = off
 - TurnOn() -- turning on the power on the plug
 - TurnOff() -- turning off the power on the plug
 - SystemInfo() -- getting information on the plug
