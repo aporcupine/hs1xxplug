@@ -3,6 +3,7 @@ package hs1xxplug
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -13,16 +14,49 @@ type Hs1xxPlug struct {
 	IPAddress string
 }
 
+type dailyStatsMessage struct {
+	Emeter struct {
+		GetDaystat struct {
+			Month int `json:"month"`
+			Year  int `json:"year"`
+		} `json:"get_daystat"`
+	} `json:"emeter"`
+}
+
+type sysInfoMessage struct {
+	System struct {
+		GetSysinfo struct {
+		} `json:"get_sysinfo"`
+	} `json:"system"`
+}
+
+type meterInfoMessage struct {
+	Emeter struct {
+		GetRealtime   struct{} `json:"get_realtime"`
+		GetVgainIgain struct{} `json:"get_vgain_igain"`
+	} `json:"emeter"`
+	System struct {
+		GetSysinfo struct {
+		} `json:"get_sysinfo"`
+	} `json:"system"`
+}
+
+type setStateMessage struct {
+	System struct {
+		SetRelayState struct {
+			State int `json:"state"`
+		} `json:"set_relay_state"`
+	} `json:"system"`
+}
+
 // SetState sets the state of the plug where true = on and false = off
 func (p *Hs1xxPlug) SetState(state bool) (err error) {
-	var stateInt int8
+	message := setStateMessage{}
 	if state {
-		stateInt = 1
+		message.System.SetRelayState.State = 1
 	}
-	// TODO: Make this a struct
-	json := fmt.Sprintf(`{"system":{"set_relay_state":{"state":%d}}}`, stateInt)
-	data := encrypt(json)
-	_, err = send(p.IPAddress, data)
+	json, _ := json.Marshal(message)
+	_, err = send(p.IPAddress, encrypt(json))
 	return
 }
 
@@ -37,9 +71,9 @@ func (p *Hs1xxPlug) TurnOff() (err error) {
 }
 
 func (p *Hs1xxPlug) SystemInfo() (results string, err error) {
-	json := `{"system":{"get_sysinfo":{}}}`
-	data := encrypt(json)
-	reading, err := send(p.IPAddress, data)
+	message := sysInfoMessage{}
+	json, _ := json.Marshal(message)
+	reading, err := send(p.IPAddress, encrypt(json))
 	if err == nil {
 		results = decrypt(reading[4:])
 	}
@@ -47,9 +81,9 @@ func (p *Hs1xxPlug) SystemInfo() (results string, err error) {
 }
 
 func (p *Hs1xxPlug) MeterInfo() (results string, err error) {
-	json := `{"system":{"get_sysinfo":{}}, "emeter":{"get_realtime":{},"get_vgain_igain":{}}}`
-	data := encrypt(json)
-	reading, err := send(p.IPAddress, data)
+	message := meterInfoMessage{}
+	json, _ := json.Marshal(message)
+	reading, err := send(p.IPAddress, encrypt(json))
 	if err == nil {
 		results = decrypt(reading[4:])
 	}
@@ -57,16 +91,18 @@ func (p *Hs1xxPlug) MeterInfo() (results string, err error) {
 }
 
 func (p *Hs1xxPlug) DailyStats(month int, year int) (results string, err error) {
-	json := fmt.Sprintf(`{"emeter":{"get_daystat":{"month":%d,"year":%d}}}`, month, year)
-	data := encrypt(json)
-	reading, err := send(p.IPAddress, data)
+	message := dailyStatsMessage{}
+	message.Emeter.GetDaystat.Month = month
+	message.Emeter.GetDaystat.Year = year
+	json, _ := json.Marshal(message)
+	reading, err := send(p.IPAddress, encrypt(json))
 	if err == nil {
 		results = decrypt(reading[4:])
 	}
 	return
 }
 
-func encrypt(plaintext string) []byte {
+func encrypt(plaintext []byte) []byte {
 	n := len(plaintext)
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, uint32(n))
